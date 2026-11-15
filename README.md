@@ -19,7 +19,7 @@ Este sistema implementa um processador de apostas financeiramente correto, conco
 - **Banco de Dados**: PostgreSQL 16 com TypeORM
 - **Mensageria**: SQS via LocalStack (compatível AWS)
 - **Containerização**: Docker Compose
-- **Testes**: Jest (testes unitários + testes de validação de arquitetura)
+- **Testes**: Jest (testes de validação de arquitetura + testes e2e com PostgreSQL/LocalStack reais)
 
 ## Início Rápido
 
@@ -64,7 +64,7 @@ bun run start:dev
 
 ## Endpoints da API
 
-Todos os endpoints estão no path raiz (sem prefixo `/api`).
+Todos os endpoints estão sob o prefixo `/api` (ex: `/api/wallets`, `/api/wagering/transactions`).
 
 ### Wallets
 
