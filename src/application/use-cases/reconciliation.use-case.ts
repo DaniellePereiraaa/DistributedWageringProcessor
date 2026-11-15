@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { WalletRepository } from '@/infrastructure/persistence/typeorm/wallet.repository';
-import { LedgerEntryRepository } from '@/infrastructure/persistence/typeorm/ledger-entry.repository';
+import { Inject, Injectable } from '@nestjs/common';
+import { WalletRepositoryInterface } from '@/infrastructure/persistence/interfaces/wallet.repository.interface';
+import { LedgerEntryRepositoryInterface } from '@/infrastructure/persistence/interfaces/ledger-entry.repository.interface';
 import { Wallet } from '@/domain/entities/wallet.entity';
 import { Money } from '@/common/value-objects/money.value-object';
 import { WalletNotFoundException, ReconciliationMismatchException } from '@/common/exceptions/domain.exceptions';
+import { REPOSITORY_TOKENS } from '@/infrastructure/persistence/repository-tokens';
 
 export interface ReconciliationResult {
   walletId: string;
@@ -17,8 +18,10 @@ export interface ReconciliationResult {
 @Injectable()
 export class ReconciliationUseCase {
   constructor(
-    private readonly walletRepository: WalletRepository,
-    private readonly ledgerRepository: LedgerEntryRepository
+    @Inject(REPOSITORY_TOKENS.WALLET)
+    private readonly walletRepository: WalletRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.LEDGER_ENTRY)
+    private readonly ledgerRepository: LedgerEntryRepositoryInterface
   ) {}
 
   async execute(walletId: string): Promise<ReconciliationResult> {

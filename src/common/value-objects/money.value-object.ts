@@ -28,8 +28,9 @@ export class Money {
 
     const trimmed = value.trim();
 
-    // Validate format: optional minus, digits, optional decimal with exactly 2 places
-    const validFormat = /^-?\d+(\.\d{1,2})?$/.test(trimmed);
+    // Validate format: optional minus, digits, optional decimal with up to 4 places (PostgreSQL may return more)
+    // We normalize to 2 decimal places internally
+    const validFormat = /^-?\d+(\.\d+)?$/.test(trimmed);
     if (!validFormat) {
       throw new Error(`Invalid money format: ${value}. Use format like "100.50" or "100"`);
     }

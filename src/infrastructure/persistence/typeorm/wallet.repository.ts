@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager, QueryRunner } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { Wallet } from '@/domain/entities/wallet.entity';
 import { Money } from '@/common/value-objects/money.value-object';
+import { WalletRepositoryInterface } from '../interfaces/wallet.repository.interface';
 
 // TypeORM LockMode type - using string literal that matches TypeORM's internal type
 type LockMode = 'pessimistic_write' | 'pessimistic_read' | 'dirty_read' | 'pessimistic_partial_write' | 'pessimistic_write_or_fail' | 'for_no_key_update' | 'for_key_share';
 
 @Injectable()
-export class WalletRepository {
+export class WalletRepository implements WalletRepositoryInterface {
   constructor(
     @InjectRepository(Wallet)
     private readonly repository: Repository<Wallet>

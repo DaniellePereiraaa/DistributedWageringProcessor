@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
 import { OutboxEvent } from '@/domain/entities/outbox-event.entity';
+import { OutboxEventRepositoryInterface } from '../interfaces/outbox-event.repository.interface';
 
 @Injectable()
-export class OutboxEventRepository {
+export class OutboxEventRepository implements OutboxEventRepositoryInterface {
   constructor(
     @InjectRepository(OutboxEvent)
     private readonly repository: Repository<OutboxEvent>

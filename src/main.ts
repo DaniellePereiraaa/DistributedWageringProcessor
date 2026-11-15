@@ -1,3 +1,15 @@
+import { register } from 'tsconfig-paths';
+const path = require('path');
+
+// Register tsconfig-paths for runtime alias resolution (@/ -> dist/)
+// In production, compiled files are in dist/ directly (not dist/src/)
+register({
+  baseUrl: path.join(__dirname),
+  paths: {
+    '@/*': ['*'],
+  },
+});
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';

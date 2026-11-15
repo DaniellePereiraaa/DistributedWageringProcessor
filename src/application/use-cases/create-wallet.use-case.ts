@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { WalletRepository } from '@/infrastructure/persistence/typeorm/wallet.repository';
-import { WagerTransactionRepository } from '@/infrastructure/persistence/typeorm/wager-transaction.repository';
-import { LedgerEntryRepository } from '@/infrastructure/persistence/typeorm/ledger-entry.repository';
-import { OutboxEventRepository } from '@/infrastructure/persistence/typeorm/outbox-event.repository';
+import { Inject, Injectable } from '@nestjs/common';
+import { WalletRepositoryInterface } from '@/infrastructure/persistence/interfaces/wallet.repository.interface';
+import { WagerTransactionRepositoryInterface } from '@/infrastructure/persistence/interfaces/wager-transaction.repository.interface';
+import { LedgerEntryRepositoryInterface } from '@/infrastructure/persistence/interfaces/ledger-entry.repository.interface';
+import { OutboxEventRepositoryInterface } from '@/infrastructure/persistence/interfaces/outbox-event.repository.interface';
 import { Wallet, Currency } from '@/domain/entities/wallet.entity';
 import { WagerTransaction, TransactionKind, TransactionStatus } from '@/domain/entities/wager-transaction.entity';
 import { LedgerEntry, LedgerEntryType } from '@/domain/entities/ledger-entry.entity';
@@ -14,6 +14,7 @@ import {
   WalletNotFoundException,
   InvalidCurrencyException,
 } from '../../common/exceptions/domain.exceptions';
+import { REPOSITORY_TOKENS } from '@/infrastructure/persistence/repository-tokens';
 
 export interface CreateWalletCommand {
   playerId: string;
@@ -29,10 +30,14 @@ export interface CreateWalletResult {
 @Injectable()
 export class CreateWalletUseCase {
   constructor(
-    private readonly walletRepository: WalletRepository,
-    private readonly transactionRepository: WagerTransactionRepository,
-    private readonly ledgerRepository: LedgerEntryRepository,
-    private readonly outboxRepository: OutboxEventRepository,
+    @Inject(REPOSITORY_TOKENS.WALLET)
+    private readonly walletRepository: WalletRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.WAGER_TRANSACTION)
+    private readonly transactionRepository: WagerTransactionRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.LEDGER_ENTRY)
+    private readonly ledgerRepository: LedgerEntryRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.OUTBOX_EVENT)
+    private readonly outboxRepository: OutboxEventRepositoryInterface,
     @InjectDataSource() private readonly dataSource: DataSource
   ) {}
 

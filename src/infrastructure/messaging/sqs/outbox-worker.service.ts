@@ -1,9 +1,10 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EntityManager } from 'typeorm';
-import { OutboxEventRepository } from '@/infrastructure/persistence/typeorm/outbox-event.repository';
+import { OutboxEventRepositoryInterface } from '@/infrastructure/persistence/interfaces/outbox-event.repository.interface';
 import { OutboxEvent } from '@/domain/entities/outbox-event.entity';
 import { DataSource } from 'typeorm';
+import { REPOSITORY_TOKENS } from '@/infrastructure/persistence/repository-tokens';
 
 interface EventPublisher {
   publish(event: OutboxEvent): Promise<void>;
@@ -23,7 +24,8 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly outboxRepository: OutboxEventRepository,
+    @Inject(REPOSITORY_TOKENS.OUTBOX_EVENT)
+    private readonly outboxRepository: OutboxEventRepositoryInterface,
     private readonly dataSource: DataSource
   ) {}
 

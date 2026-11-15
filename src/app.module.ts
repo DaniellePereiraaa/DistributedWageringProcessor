@@ -3,10 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TerminusModule } from '@nestjs/terminus';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { PresentationModule } from './presentation/presentation.module';
-import { SqsConsumerService } from '@/infrastructure/messaging/sqs/sqs-consumer.service';
-import { OutboxWorkerService } from '@/infrastructure/messaging/sqs/outbox-worker.service';
-import { RetryWorkerService } from '@/infrastructure/messaging/sqs/retry-worker.service';
+import { PersistenceModule } from '@/infrastructure/persistence/persistence.module';
+import { HealthController } from './presentation/controllers/health.controller';
 import { Wallet } from '@/domain/entities/wallet.entity';
 import { WagerTransaction } from '@/domain/entities/wager-transaction.entity';
 import { LedgerEntry } from '@/domain/entities/ledger-entry.entity';
@@ -31,6 +31,7 @@ import { InboxMessage } from '@/domain/entities/inbox-message.entity';
         entities: [Wallet, WagerTransaction, LedgerEntry, OutboxEvent, InboxMessage],
         synchronize: false, // Use migrations in production
         logging: configService.get('NODE_ENV') === 'development',
+        namingStrategy: new SnakeNamingStrategy(),
         extra: {
           max: 20, // Connection pool size
         },
@@ -40,11 +41,8 @@ import { InboxMessage } from '@/domain/entities/inbox-message.entity';
     ScheduleModule.forRoot(),
     TerminusModule,
     PresentationModule,
+    PersistenceModule,
   ],
-  providers: [
-    SqsConsumerService,
-    OutboxWorkerService,
-    RetryWorkerService,
-  ],
+  controllers: [HealthController],
 })
 export class AppModule {}

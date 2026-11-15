@@ -1,10 +1,11 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EntityManager } from 'typeorm';
-import { WagerTransactionRepository } from '@/infrastructure/persistence/typeorm/wager-transaction.repository';
+import { WagerTransactionRepositoryInterface } from '@/infrastructure/persistence/interfaces/wager-transaction.repository.interface';
 import { ProcessWagerTransactionUseCase, ProcessWagerTransactionCommand } from '@/application/use-cases/process-wager-transaction.use-case';
 import { WagerTransaction, TransactionStatus, TransactionKind } from '@/domain/entities/wager-transaction.entity';
 import { DataSource } from 'typeorm';
+import { REPOSITORY_TOKENS } from '@/infrastructure/persistence/repository-tokens';
 
 @Injectable()
 export class RetryWorkerService implements OnModuleInit, OnModuleDestroy {
@@ -14,7 +15,8 @@ export class RetryWorkerService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly transactionRepository: WagerTransactionRepository,
+    @Inject(REPOSITORY_TOKENS.WAGER_TRANSACTION)
+    private readonly transactionRepository: WagerTransactionRepositoryInterface,
     private readonly processTransactionUseCase: ProcessWagerTransactionUseCase,
     private readonly dataSource: DataSource
   ) {}

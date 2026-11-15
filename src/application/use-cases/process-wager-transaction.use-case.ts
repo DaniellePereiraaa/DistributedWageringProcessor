@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { WalletRepository } from '@/infrastructure/persistence/typeorm/wallet.repository';
-import { WagerTransactionRepository } from '@/infrastructure/persistence/typeorm/wager-transaction.repository';
-import { LedgerEntryRepository } from '@/infrastructure/persistence/typeorm/ledger-entry.repository';
-import { OutboxEventRepository } from '@/infrastructure/persistence/typeorm/outbox-event.repository';
-import { InboxMessageRepository } from '@/infrastructure/persistence/typeorm/inbox-message.repository';
+import { Inject, Injectable } from '@nestjs/common';
+import { WalletRepositoryInterface } from '@/infrastructure/persistence/interfaces/wallet.repository.interface';
+import { WagerTransactionRepositoryInterface } from '@/infrastructure/persistence/interfaces/wager-transaction.repository.interface';
+import { LedgerEntryRepositoryInterface } from '@/infrastructure/persistence/interfaces/ledger-entry.repository.interface';
+import { OutboxEventRepositoryInterface } from '@/infrastructure/persistence/interfaces/outbox-event.repository.interface';
+import { InboxMessageRepositoryInterface } from '@/infrastructure/persistence/interfaces/inbox-message.repository.interface';
 import { Wallet } from '@/domain/entities/wallet.entity';
 import { WagerTransaction, TransactionKind, TransactionStatus } from '@/domain/entities/wager-transaction.entity';
 import { LedgerEntry, LedgerEntryType } from '@/domain/entities/ledger-entry.entity';
@@ -21,6 +21,7 @@ import {
   InvalidTransactionStateException,
   OptimisticLockException,
 } from '../../common/exceptions/domain.exceptions';
+import { REPOSITORY_TOKENS } from '@/infrastructure/persistence/repository-tokens';
 
 export interface ProcessWagerTransactionCommand {
   walletId: string;
@@ -43,11 +44,16 @@ export interface ProcessWagerTransactionResult {
 @Injectable()
 export class ProcessWagerTransactionUseCase {
   constructor(
-    private readonly walletRepository: WalletRepository,
-    private readonly transactionRepository: WagerTransactionRepository,
-    private readonly ledgerRepository: LedgerEntryRepository,
-    private readonly outboxRepository: OutboxEventRepository,
-    private readonly inboxRepository: InboxMessageRepository,
+    @Inject(REPOSITORY_TOKENS.WALLET)
+    private readonly walletRepository: WalletRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.WAGER_TRANSACTION)
+    private readonly transactionRepository: WagerTransactionRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.LEDGER_ENTRY)
+    private readonly ledgerRepository: LedgerEntryRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.OUTBOX_EVENT)
+    private readonly outboxRepository: OutboxEventRepositoryInterface,
+    @Inject(REPOSITORY_TOKENS.INBOX_MESSAGE)
+    private readonly inboxRepository: InboxMessageRepositoryInterface,
     @InjectDataSource() private readonly dataSource: DataSource
   ) {}
 
@@ -79,7 +85,7 @@ export class ProcessWagerTransactionUseCase {
       }
     }
 
-    // Check idempotency key conflict (same key, different payload)
+    // Check idempotency key conflict (same key, different payload) - check inbox
     const existingByIdempotency = await this.inboxRepository.findByIdempotencyKey(command.idempotencyKey);
     if (existingByIdempotency && existingByIdempotency.messageId !== command.messageId) {
       throw new IdempotencyConflictException(command.idempotencyKey, existingByIdempotency.messageId);
