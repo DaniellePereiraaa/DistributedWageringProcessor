@@ -1,196 +1,196 @@
-# Distributed Wagering Processor
+# Processador Distribuído de Apostas
 
-**Jungle Gaming Backend Challenge** - A distributed wagering processor built with NestJS, TypeScript, PostgreSQL, and SQS (LocalStack).
+**Desafio Backend Jungle Gaming** - Um processador de apostas distribuído construído com NestJS, TypeScript, PostgreSQL e SQS (LocalStack).
 
-## Architecture Overview
+## Visão Geral da Arquitetura
 
-This system implements a financially correct, concurrent, and resilient wagering processor with:
+Este sistema implementa um processador de apostas financeiramente correto, concorrente e resiliente com:
 
-- **Financial Correctness**: Immutable `Money` value object (decimal strings, 2dp), no floats
-- **Concurrency**: Pessimistic locking per `walletId` (unit of concurrency), optimistic locking via version column
-- **Idempotency**: Persistent deduplication via `Idempotency-Key` header and Inbox table
-- **Consistency**: Wallet balance, Ledger, Inbox, and Outbox updated in single SQL transaction
-- **Ordering**: Out-of-order message handling via `PENDING_REFERENCE` status and retry worker
+- **Correção Financeira**: Value Object `Money` imutável (strings decimais, 2 casas), sem floats
+- **Concorrência**: Lock pessimista por `walletId` (unidade de concorrência), lock otimista via coluna version
+- **Idempotência**: Deduplicação persistente via header `Idempotency-Key` e tabela Inbox
+- **Consistência**: Saldo da wallet, Ledger, Inbox e Outbox atualizados em transação SQL única
+- **Ordenação**: Tratamento de mensagens fora de ordem via status `PENDING_REFERENCE` e worker de retry
 
-## Tech Stack
+## Stack Tecnológica
 
-- **Framework**: NestJS 10 with TypeScript
-- **Runtime**: Bun (fast Node.js alternative)
-- **Database**: PostgreSQL 16 with TypeORM
-- **Messaging**: SQS via LocalStack (AWS compatible)
-- **Containerization**: Docker Compose
-- **Testing**: Jest (unit tests + architecture validation tests)
+- **Framework**: NestJS 10 com TypeScript
+- **Runtime**: Bun (alternativa rápida ao Node.js)
+- **Banco de Dados**: PostgreSQL 16 com TypeORM
+- **Mensageria**: SQS via LocalStack (compatível AWS)
+- **Containerização**: Docker Compose
+- **Testes**: Jest (testes unitários + testes de validação de arquitetura)
 
-## Quick Start
+## Início Rápido
 
-### Prerequisites
+### Pré-requisitos
 
-- Docker and Docker Compose
-- Bun (optional, for local development without Docker)
+- Docker e Docker Compose
+- Bun (opcional, para desenvolvimento local sem Docker)
 
-### Using Docker Compose (Recommended)
+### Usando Docker Compose (Recomendado)
 
 ```bash
-# Start all services
+# Iniciar todos os serviços
 docker-compose up -d
 
-# Check logs
+# Ver logs
 docker-compose logs -f app
 
-# Stop services
+# Parar serviços
 docker-compose down
 ```
 
-The API will be available at:
+A API estará disponível em:
 - **API**: http://localhost:3000
 - **Swagger Docs**: http://localhost:3000/docs
 - **Health**: http://localhost:3000/health/live | /ready
 
-### Local Development
+### Desenvolvimento Local
 
 ```bash
-# Install dependencies
+# Instalar dependências
 bun install
 
-# Start PostgreSQL and LocalStack only
+# Iniciar apenas PostgreSQL e LocalStack
 docker-compose up -d postgres localstack
 
-# Run migrations
+# Rodar migrações
 bun run db:migrate
 
-# Start development server
+# Iniciar servidor de desenvolvimento
 bun run start:dev
 ```
 
-## API Endpoints
+## Endpoints da API
 
-All endpoints are under the root path (no `/api` prefix).
+Todos os endpoints estão no path raiz (sem prefixo `/api`).
 
 ### Wallets
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/wallets` | Create wallet with initial OPENING transaction |
-| GET | `/wallets/:id` | Get wallet by ID |
-| GET | `/wallets/:id/ledger` | Get ledger entries (cursor pagination) |
-| GET | `/wallets/:id/transactions` | Get wallet transactions |
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/wallets` | Criar wallet com transação OPENING inicial |
+| GET | `/wallets/:id` | Buscar wallet por ID |
+| GET | `/wallets/:id/ledger` | Buscar entradas do ledger (paginação com cursor) |
+| GET | `/wallets/:id/transactions` | Buscar transações da wallet |
 
-### Wagering
+### Apostas
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/wagering/transactions` | Submit transaction (requires `Idempotency-Key` header) |
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/wagering/transactions` | Submeter transação (requer header `Idempotency-Key`) |
 
-### Reconciliation
+### Reconciliação
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/wallets/:id/reconciliation` | Compare stored vs calculated balance |
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/wallets/:id/reconciliation` | Comparar saldo armazenado vs calculado |
 
 ### Health
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health/live` | Liveness probe |
-| GET | `/health/ready` | Readiness probe |
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/health/live` | Probe de liveness |
+| GET | `/health/ready` | Probe de readiness |
 
-## Transaction Kinds
+## Tipos de Transação
 
-| Kind | Type | Ledger | Description |
-|------|------|--------|-------------|
-| `BET` | Debit | Yes | Player places a bet |
-| `WIN` | Credit | Yes | Player wins |
-| `LOSS` | None | No | Player loses (no balance change) |
-| `REFUND` | Credit | Yes | Refund a previous BET |
-| `ROLLBACK` | Debit | Yes | Rollback a REFUND |
-| `OPENING` | Credit | Yes | Initial wallet funding |
+| Tipo | Tipo | Ledger | Descrição |
+|------|------|--------|-----------|
+| `BET` | Débito | Sim | Jogador faz uma aposta |
+| `WIN` | Crédito | Sim | Jogador ganha |
+| `LOSS` | Nenhum | Não | Jogador perde (sem mudança de saldo) |
+| `REFUND` | Crédito | Sim | Estorna um BET anterior |
+| `ROLLBACK` | Débito | Sim | Estorna um REFUND |
+| `OPENING` | Crédito | Sim | Financiamento inicial da wallet |
 
-## Idempotency
+## Idempotência
 
-All wagering transactions require an `Idempotency-Key` header:
+Todas as transações de apostas requerem header `Idempotency-Key`:
 
 ```bash
 curl -X POST http://localhost:3000/wagering/transactions \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: unique-key-123" \
+  -H "Idempotency-Key: chave-unica-123" \
   -d '{
     "walletId": "uuid",
     "kind": "BET",
     "amount": "50.00",
-    "idempotencyKey": "unique-key-123"
+    "idempotencyKey": "chave-unica-123"
   }'
 ```
 
-- Same key + same payload = returns existing result (202)
-- Same key + different payload = 409 Conflict
-- Keys are stored persistently in Inbox table (composite key: consumerName + messageId)
+- Mesma chave + mesmo payload = retorna resultado existente (202)
+- Mesma chave + payload diferente = 409 Conflict
+- Chaves armazenadas persistentemente na tabela Inbox (chave composta: consumerName + messageId)
 
-## Concurrency Handling
+## Tratamento de Concorrência
 
-The system handles concurrent transactions on the same wallet using:
+O sistema lida com transações concorrentes na mesma wallet usando:
 
-1. **Pessimistic Locking**: `SELECT ... FOR UPDATE SKIP LOCKED` on wallet row during transaction processing
-2. **Optimistic Locking**: Version column on Wallet entity for retry detection
-3. **Unit of Concurrency**: `walletId` - different wallets process in parallel
+1. **Lock Pessimista**: `SELECT ... FOR UPDATE SKIP LOCKED` na linha da wallet durante processamento
+2. **Lock Otimista**: Coluna version na entity Wallet para detecção de retry
+3. **Unidade de Concorrência**: `walletId` - wallets diferentes processam em paralelo
 
-## Out-of-Order Messages
+## Mensagens Fora de Ordem
 
-REFUND/ROLLBACK transactions may arrive before their reference BET:
+Transações REFUND/ROLLBACK podem chegar antes do BET de referência:
 
-1. Transaction marked as `PENDING_REFERENCE`
-2. Stored in database with reference ID
-3. Retry worker polls every 30s and reprocesses when reference is available
-4. Exponential backoff for repeated failures
+1. Transação marcada como `PENDING_REFERENCE`
+2. Armazenada no banco com referenceTransactionId
+3. Worker de retry faz polling a cada 30s e reprocessa quando referência está disponível
+4. Backoff exponencial para falhas repetidas
 
-## Running Tests
+## Rodando Testes
 
 ```bash
-# Unit tests
+# Testes unitários
 bun run test
 
-# Integration tests (requires Docker)
+# Testes de integração (requer Docker)
 bun run test:e2e
 
-# Coverage
+# Cobertura
 bun run test:cov
 ```
 
-## Project Structure
+## Estrutura do Projeto
 
 ```
 src/
-├── app.module.ts           # Main application module
-├── main.ts                 # Entry point
-├── data-source.ts          # TypeORM CLI data source
+├── app.module.ts           # Módulo principal da aplicação
+├── main.ts                 # Ponto de entrada
+├── data-source.ts          # Data Source TypeORM para CLI
 ├── common/
-│   ├── value-objects/      # Money value object
-│   ├── exceptions/         # Domain exceptions
-│   └── utils/              # Transactional outbox utilities
+│   ├── value-objects/      # Value Object Money
+│   ├── exceptions/         # Exceções de domínio
+│   └── utils/              # Utilitários de outbox transacional
 ├── domain/
 │   └── entities/           # Wallet, WagerTransaction, LedgerEntry, InboxMessage, OutboxEvent
 ├── application/
-│   └── use-cases/          # Business logic use cases
+│   └── use-cases/          # Lógica de negócio (use cases)
 ├── infrastructure/
 │   ├── persistence/
-│   │   └── typeorm/        # TypeORM repositories
+│   │   └── typeorm/        # Repositórios TypeORM
 │   └── messaging/
-│       └── sqs/            # SQS Consumer, Outbox Worker, Retry Worker
+│       └── sqs/            # Consumer SQS, Outbox Worker, Retry Worker
 └── presentation/
-    ├── controllers/        # REST controllers
-    ├── dtos/               # Data transfer objects
+    ├── controllers/        # Controllers REST
+    ├── dtos/               # Data Transfer Objects
     └── presentation.module.ts
 ```
 
-## Configuration
+## Configuração
 
-Environment variables (`.env`):
+Variáveis de ambiente (`.env`):
 
 ```env
-# Application
+# Aplicação
 NODE_ENV=development
 PORT=3000
 
-# Database
+# Banco de Dados
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USERNAME=postgres
@@ -214,9 +214,9 @@ RETRY_WORKER_INTERVAL_MS=30000
 RETRY_WORKER_BATCH_SIZE=50
 ```
 
-## Complete Usage Examples
+## Exemplos Completos de Uso
 
-### 1. Create a Wallet
+### 1. Criar uma Wallet
 
 ```bash
 curl -X POST http://localhost:3000/wallets \
@@ -228,7 +228,7 @@ curl -X POST http://localhost:3000/wallets \
   }'
 ```
 
-Response (201):
+Resposta (201):
 ```json
 {
   "id": "uuid",
@@ -241,23 +241,23 @@ Response (201):
 }
 ```
 
-### 2. Place a Bet (BET)
+### 2. Fazer uma Aposta (BET)
 
 ```bash
 curl -X POST http://localhost:3000/wagering/transactions \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: bet-001" \
   -d '{
-    "walletId": "WALLET_UUID_FROM_STEP_1",
+    "walletId": "WALLET_UUID_DO_PASSO_1",
     "kind": "BET",
     "amount": "25.00",
     "idempotencyKey": "bet-001",
-    "description": "Bet on game 123",
+    "description": "Aposta no jogo 123",
     "metadata": { "gameId": "game-123" }
   }'
 ```
 
-Response (202):
+Resposta (202):
 ```json
 {
   "id": "TRANSACTION_UUID",
@@ -267,14 +267,14 @@ Response (202):
   "status": "PROCESSED",
   "referenceTransactionId": null,
   "idempotencyKey": "bet-001",
-  "description": "Bet on game 123",
+  "description": "Aposta no jogo 123",
   "metadata": { "gameId": "game-123" },
   "createdAt": "2024-01-15T10:30:00.000Z",
   "updatedAt": "2024-01-15T10:30:00.000Z"
 }
 ```
 
-### 3. Register a Win (WIN)
+### 3. Registrar uma Vitória (WIN)
 
 ```bash
 curl -X POST http://localhost:3000/wagering/transactions \
@@ -285,12 +285,12 @@ curl -X POST http://localhost:3000/wagering/transactions \
     "kind": "WIN",
     "amount": "50.00",
     "idempotencyKey": "win-001",
-    "referenceTransactionId": "TRANSACTION_UUID_FROM_STEP_2",
-    "description": "Win on game 123"
+    "referenceTransactionId": "TRANSACTION_UUID_DO_PASSO_2",
+    "description": "Vitória no jogo 123"
   }'
 ```
 
-### 4. Register a Loss (LOSS) - No Ledger Entry
+### 4. Registrar uma Derrota (LOSS) - Sem Entrada no Ledger
 
 ```bash
 curl -X POST http://localhost:3000/wagering/transactions \
@@ -301,14 +301,14 @@ curl -X POST http://localhost:3000/wagering/transactions \
     "kind": "LOSS",
     "amount": "25.00",
     "idempotencyKey": "loss-001",
-    "referenceTransactionId": "TRANSACTION_UUID_FROM_STEP_2"
+    "referenceTransactionId": "TRANSACTION_UUID_DO_PASSO_2"
   }'
 ```
 
-### 5. Refund a Bet (REFUND) - Out-of-Order Safe
+### 5. Estornar uma Aposta (REFUND) - Seguro para Fora de Ordem
 
 ```bash
-# If reference transaction doesn't exist yet, goes to PENDING_REFERENCE
+# Se a transação de referência não existir ainda, vai para PENDING_REFERENCE
 curl -X POST http://localhost:3000/wagering/transactions \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: refund-001" \
@@ -317,11 +317,11 @@ curl -X POST http://localhost:3000/wagering/transactions \
     "kind": "REFUND",
     "amount": "25.00",
     "idempotencyKey": "refund-001",
-    "referenceTransactionId": "TRANSACTION_UUID_FROM_STEP_2"
+    "referenceTransactionId": "TRANSACTION_UUID_DO_PASSO_2"
   }'
 ```
 
-### 6. Rollback a Refund (ROLLBACK)
+### 6. Estornar um Refund (ROLLBACK)
 
 ```bash
 curl -X POST http://localhost:3000/wagering/transactions \
@@ -336,35 +336,35 @@ curl -X POST http://localhost:3000/wagering/transactions \
   }'
 ```
 
-### 7. Get Wallet Balance
+### 7. Consultar Saldo da Wallet
 
 ```bash
 curl http://localhost:3000/wallets/WALLET_UUID
 ```
 
-### 8. Get Ledger Entries (Cursor Pagination)
+### 8. Consultar Entradas do Ledger (Paginação com Cursor)
 
 ```bash
-# First page
+# Primeira página
 curl "http://localhost:3000/wallets/WALLET_UUID/ledger?limit=50"
 
-# Next page (use nextCursor from previous response)
+# Próxima página (use nextCursor da resposta anterior)
 curl "http://localhost:3000/wallets/WALLET_UUID/ledger?cursor=2024-01-15T10:30:00.000Z&limit=50"
 ```
 
-### 9. Get Wallet Transactions
+### 9. Consultar Transações da Wallet
 
 ```bash
 curl "http://localhost:3000/wallets/WALLET_UUID/transactions?limit=50&offset=0&status=PROCESSED"
 ```
 
-### 10. Reconcile Wallet (Validate Balance)
+### 10. Reconciliar Wallet (Validar Saldo)
 
 ```bash
 curl -X POST http://localhost:3000/wallets/WALLET_UUID/reconciliation
 ```
 
-Response (200 - matched):
+Resposta (200 - compatível):
 ```json
 {
   "walletId": "WALLET_UUID",
@@ -375,7 +375,7 @@ Response (200 - matched):
 }
 ```
 
-Response (400 - mismatch):
+Resposta (400 - divergência):
 ```json
 {
   "statusCode": 400,
@@ -384,9 +384,9 @@ Response (400 - mismatch):
 }
 ```
 
-## Architecture Deep Dive
+## Detalhamento da Arquitetura
 
-### Transactional Flow (Create Wallet)
+### Fluxo Transacional (Criar Wallet)
 
 ```
 HTTP Request
@@ -394,7 +394,7 @@ HTTP Request
     ▼
 CreateWalletUseCase.execute()
     │
-    ├── TypeORM Transaction begins
+    ├── Transação TypeORM inicia
     │
     ├── WalletRepository.createWithOpeningTransaction()
     │   └── INSERT INTO wallets (player_id, currency, balance=100.00)
@@ -414,70 +414,70 @@ CreateWalletUseCase.execute()
     └── Transaction COMMIT
         │
         ▼
-OutboxWorker (async, separate process)
+OutboxWorker (assíncrono, processo separado)
     │
     ├── SELECT * FROM outbox_events WHERE processed_at IS NULL FOR UPDATE SKIP LOCKED
     │
-    ├── Publish to SQS
+    ├── Publica no SQS
     │
     └── UPDATE outbox_events SET processed_at=NOW() WHERE id IN (...)
 ```
 
-### Concurrent BET Processing
+### Processamento Concorrente de BET
 
 ```
 Request 1 (BET 50.00)          Request 2 (BET 30.00)          Request 3 (WIN 100.00)
      │                              │                              │
      ▼                              ▼                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    TypeORM Transaction                              │
+│                    Transação TypeORM                                │
 │  SELECT * FROM wallets WHERE id=? FOR UPDATE SKIP LOCKED           │
 │  ─────────────────────────────────────────────────────────────     │
-│  Request 1 gets lock, Request 2 & 3 wait                           │
-│  Request 1: balance 100→50, creates ledger, outbox, inbox          │
+│  Request 1 obtém lock, Request 2 & 3 aguardam                      │
+│  Request 1: saldo 100→50, cria ledger, outbox, inbox               │
 │  COMMIT                                                             │
 │  ─────────────────────────────────────────────────────────────     │
-│  Request 2 gets lock, Request 3 waits                              │
-│  Request 2: balance 50→20, creates ledger, outbox, inbox           │
+│  Request 2 obtém lock, Request 3 aguarda                           │
+│  Request 2: saldo 50→20, cria ledger, outbox, inbox                │
 │  COMMIT                                                             │
 │  ─────────────────────────────────────────────────────────────     │
-│  Request 3 gets lock                                               │
-│  Request 3: balance 20→120, creates ledger, outbox, inbox          │
+│  Request 3 obtém lock                                              │
+│  Request 3: saldo 20→120, cria ledger, outbox, inbox               │
 │  COMMIT                                                             │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Out-of-Order REFUND Handling
+### Tratamento de REFUND Fora de Ordem
 
 ```
 Timeline:
 ────────────────────────────────────────────────────────────────────►
 
-T1: BET arrives → PROCESSED (balance 100→50)
+T1: BET chega → PROCESSED (saldo 100→50)
 
-T2: REFUND arrives BEFORE BET (race condition)
-    → Creates transaction with status=PENDING_REFERENCE
-    → Stores referenceTransactionId
-    → Does NOT touch wallet balance yet
+T2: REFUND chega ANTES do BET (race condition)
+    → Cria transação com status=PENDING_REFERENCE
+    → Armazena referenceTransactionId
+    → NÃO toca no saldo da wallet ainda
 
-T3: BET arrives (or was processed at T1)
+T3: BET chega (ou foi processado em T1)
     → PROCESSED
 
-T4: Retry Worker (polls every 30s)
-    → Finds REFUND with PENDING_REFERENCE
-    → Checks if reference BET is PROCESSED
-    → If yes: reprocesses REFUND → PROCESSED (balance 50→75)
-    → If no: keeps as PENDING_REFERENCE for next poll
+T4: Retry Worker (faz polling a cada 30s)
+    → Encontra REFUND com PENDING_REFERENCE
+    → Verifica se BET de referência está PROCESSED
+    → Se sim: reprocessa REFUND → PROCESSED (saldo 50→75)
+    → Se não: mantém como PENDING_REFERENCE para próximo poll
 ```
 
-## Error Classification
+## Classificação de Erros
 
-| Category | Examples | Handling |
-|----------|----------|----------|
-| **Business** | Insufficient balance, Wallet not found, Idempotency conflict | Return 4xx, no retry |
-| **Transient** | DB deadlock, Network timeout, SQS throttling | Retry with backoff |
-| **Permanent** | Invalid data, Constraint violations | Dead letter queue |
+| Categoria | Exemplos | Tratamento |
+|-----------|----------|------------|
+| **Negócio** | Saldo insuficiente, Wallet não encontrada, Conflito idempotência | Retorna 4xx, sem retry |
+| **Transiente** | Deadlock DB, Timeout rede, Throttling SQS | Retry com backoff |
+| **Permanente** | Dados inválidos, Violação constraints | Dead letter queue |
 
-## License
+## Licença
 
 MIT
