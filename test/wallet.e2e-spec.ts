@@ -1,34 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { Wallet } from '../src/domain/entities/wallet.entity';
 import { WagerTransaction, TransactionKind, TransactionStatus } from '../src/domain/entities/wager-transaction.entity';
 import { LedgerEntry, LedgerEntryType } from '../src/domain/entities/ledger-entry.entity';
 import { Currency } from '../src/domain/entities/wallet.entity';
 import { Money } from '../src/common/value-objects/money.value-object';
-import { dataSource } from './setup-e2e';
+import { dataSource, app } from './setup-e2e';
 
 describe('Wallet API (e2e)', () => {
-  let app: INestApplication;
   let walletId: string;
-
-  beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    await app.init();
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
 
   describe('POST /wallets', () => {
     it('deve criar uma carteira com transação OPENING inicial', async () => {
+      console.log('Starting test request...');
       const response = await request(app.getHttpServer())
         .post('/api/wallets')
         .send({
@@ -37,6 +20,7 @@ describe('Wallet API (e2e)', () => {
           initialAmount: '100.00',
         })
         .expect(201);
+      console.log('Request completed, status:', response.status);
 
       expect(response.body).toHaveProperty('id');
       expect(response.body.playerId).toBe('player-123');

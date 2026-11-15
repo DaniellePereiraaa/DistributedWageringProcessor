@@ -47,7 +47,7 @@ export class WagerTransaction {
   walletId: string;
 
   @ManyToOne(() => Wallet, (wallet) => wallet.transactions, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'walletId' })
+  @JoinColumn({ name: 'wallet_id' })
   wallet: Wallet;
 
   @Column({
@@ -78,7 +78,7 @@ export class WagerTransaction {
   referenceTransactionId: string | null;
 
   @OneToOne(() => WagerTransaction, { nullable: true })
-  @JoinColumn({ name: 'referenceTransactionId' })
+  @JoinColumn({ name: 'reference_transaction_id' })
   referenceTransaction: WagerTransaction | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true, unique: true })

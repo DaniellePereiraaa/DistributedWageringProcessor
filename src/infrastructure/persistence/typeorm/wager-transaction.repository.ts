@@ -23,8 +23,26 @@ export class WagerTransactionRepository implements WagerTransactionRepositoryInt
     const repo = manager ? manager.getRepository(WagerTransaction) : this.repository;
     return repo.findOne({
       where: { id },
-      relations: ['wallet', 'referenceTransaction', 'ledgerEntry'],
+      relations: ['wallet', 'ledgerEntry', 'referenceTransaction'],
     });
+  }
+
+  /**
+   * Finds reference transaction by ID with only needed fields (no wallet to avoid circular loading).
+   */
+  async findReferenceById(id: string, manager?: EntityManager): Promise<WagerTransaction | null> {
+    const repo = manager ? manager.getRepository(WagerTransaction) : this.repository;
+    return repo
+      .createQueryBuilder('tx')
+      .where('tx.id = :id', { id })
+      .select([
+        'tx.id',
+        'tx.kind',
+        'tx.amount',
+        'tx.status',
+        'tx.referenceTransactionId',
+      ])
+      .getOne();
   }
 
   /**

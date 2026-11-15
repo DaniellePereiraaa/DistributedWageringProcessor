@@ -135,12 +135,12 @@ export class LedgerEntryRepository implements LedgerEntryRepositoryInterface {
     const repo = manager ? manager.getRepository(LedgerEntry) : this.repository;
     const result = await repo
       .createQueryBuilder('entry')
-      .select('SUM(CASE WHEN entry.entryType = :credit THEN entry.amountCents ELSE -entry.amountCents END)', 'total')
+      .select('SUM(CASE WHEN entry.entryType = :credit THEN entry.amount ELSE -entry.amount END)', 'total')
       .where('entry.walletId = :walletId', { walletId })
       .setParameter('credit', LedgerEntryType.CREDIT)
       .getRawOne();
 
-    const totalCents = result?.total ? parseInt(result.total, 10) : 0;
+    const totalCents = result?.total ? Math.round(parseFloat(result.total) * 100) : 0;
     return Money.fromCents(totalCents);
   }
 

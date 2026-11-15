@@ -1,30 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { Wallet } from '../src/domain/entities/wallet.entity';
 import { WagerTransaction, TransactionKind, TransactionStatus } from '../src/domain/entities/wager-transaction.entity';
 import { OutboxEvent } from '../src/domain/entities/outbox-event.entity';
 import { Currency } from '../src/domain/entities/wallet.entity';
 import { Money } from '../src/common/value-objects/money.value-object';
-import { dataSource } from './setup-e2e';
+import { dataSource, app } from './setup-e2e';
 
 describe('Outbox Worker e Retry Worker (e2e)', () => {
-  let app: INestApplication;
-
-  beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    await app.init();
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
 
   describe('Transactional Outbox', () => {
     it('deve criar eventos de outbox na mesma transação das mudanças de domínio', async () => {

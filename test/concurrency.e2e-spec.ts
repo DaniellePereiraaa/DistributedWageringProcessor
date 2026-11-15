@@ -1,11 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { Wallet } from '../src/domain/entities/wallet.entity';
 import { Currency } from '../src/domain/entities/wallet.entity';
 import { Money } from '../src/common/value-objects/money.value-object';
-import { dataSource } from './setup-e2e';
+import { dataSource, app } from './setup-e2e';
 import { TransactionKind, TransactionStatus } from '../src/domain/entities/wager-transaction.entity';
 
 /**
@@ -18,21 +15,6 @@ import { TransactionKind, TransactionStatus } from '../src/domain/entities/wager
  * 4. Recuperação de crash: transação interrompida no meio
  */
 describe('Concurrency Tests (e2e)', () => {
-  let app: INestApplication;
-
-  beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    await app.init();
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
 
   describe('Deduplicação paralela (50 requisições simultâneas)', () => {
     it('deve processar apenas uma transação para 50 requisições com mesma idempotency key', async () => {
@@ -180,7 +162,7 @@ describe('Concurrency Tests (e2e)', () => {
   describe('Múltiplas instâncias (simulado via conexões paralelas)', () => {
     it('deve processar transações de 3 "instâncias" diferentes na mesma carteira', async () => {
       // Simula 3 instâncias do serviço processando a mesma carteira
-      // Cada "instância" faz 5 operações
+      // Cada "instância" faz 5 operações - usamos o mesmo app (shared connection pool)
       const wallet = await dataSource.getRepository(Wallet).save(
         Wallet.create('player-multi-instance', Currency.BRL)
       );
@@ -190,55 +172,39 @@ describe('Concurrency Tests (e2e)', () => {
       const instances = 3;
       const opsPerInstance = 5;
 
-      // Cria apps separados para simular instâncias diferentes
-      const apps: INestApplication[] = [];
+      // Cada "instância" faz operações concorrentes no mesmo app
+      const allPromises: Promise<any>[] = [];
+
       for (let i = 0; i < instances; i++) {
-        const moduleFixture = await Test.createTestingModule({
-          imports: [AppModule],
-        }).compile();
-        const instanceApp = moduleFixture.createNestApplication();
-        instanceApp.setGlobalPrefix('api');
-        await instanceApp.init();
-        apps.push(instanceApp);
-      }
-
-      try {
-        // Cada instância faz operações concorrentes
-        const allPromises: Promise<any>[] = [];
-
-        for (let i = 0; i < instances; i++) {
-          for (let j = 0; j < opsPerInstance; j++) {
-            const promise = request(apps[i].getHttpServer())
-              .post('/api/wagering/transactions')
-              .set('Idempotency-Key', `instance-${i}-op-${j}`)
-              .send({
-                walletId: wallet.id,
-                kind: TransactionKind.BET,
-                amount: '20.00',
-                idempotencyKey: `instance-${i}-op-${j}`,
-              });
-            allPromises.push(promise);
-          }
+        for (let j = 0; j < opsPerInstance; j++) {
+          const promise = request(app.getHttpServer())
+            .post('/api/wagering/transactions')
+            .set('Idempotency-Key', `instance-${i}-op-${j}`)
+            .send({
+              walletId: wallet.id,
+              kind: TransactionKind.BET,
+              amount: '20.00',
+              idempotencyKey: `instance-${i}-op-${j}`,
+            });
+          allPromises.push(promise);
         }
-
-        const responses = await Promise.all(allPromises);
-
-        // Todas as 15 operações devem ser processadas (saldo = 1000, 15*20 = 300)
-        const successful = responses.filter(r => r.status === 202);
-        expect(successful.length).toBe(instances * opsPerInstance);
-
-        const finalWallet = await dataSource.getRepository(Wallet).findOneBy({ id: wallet.id });
-        expect(finalWallet?.balance.toString()).toBe('700.00');
-
-        // Reconciliação
-        const reconciliationResponse = await request(apps[0].getHttpServer())
-          .post(`/api/wallets/${wallet.id}/reconciliation`)
-          .expect(200);
-
-        expect(reconciliationResponse.body.matched).toBe(true);
-      } finally {
-        await Promise.all(apps.map(a => a.close()));
       }
+
+      const responses = await Promise.all(allPromises);
+
+      // Todas as 15 operações devem ser processadas (saldo = 1000, 15*20 = 300)
+      const successful = responses.filter(r => r.status === 202);
+      expect(successful.length).toBe(instances * opsPerInstance);
+
+      const finalWallet = await dataSource.getRepository(Wallet).findOneBy({ id: wallet.id });
+      expect(finalWallet?.balance.toString()).toBe('700.00');
+
+      // Reconciliação
+      const reconciliationResponse = await request(app.getHttpServer())
+        .post(`/api/wallets/${wallet.id}/reconciliation`)
+        .expect(200);
+
+      expect(reconciliationResponse.body.matched).toBe(true);
     });
   });
 

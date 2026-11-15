@@ -119,6 +119,13 @@ export class ReconciliationMismatchException extends DomainException {
   }
 }
 
+export class InvalidReferenceException extends DomainException {
+  constructor(message: string) {
+    super(message, 'INVALID_REFERENCE', 400);
+    this.name = 'InvalidReferenceException';
+  }
+}
+
 export class TransientException extends DomainException {
   constructor(message: string, public readonly retryAfterMs?: number) {
     super(message, 'TRANSIENT_ERROR', 503);

@@ -1,26 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { Wallet } from '../src/domain/entities/wallet.entity';
 import { WagerTransaction, TransactionKind, TransactionStatus } from '../src/domain/entities/wager-transaction.entity';
 import { Currency } from '../src/domain/entities/wallet.entity';
 import { Money } from '../src/common/value-objects/money.value-object';
-import { dataSource } from './setup-e2e';
+import { dataSource, app } from './setup-e2e';
 
 describe('Wagering Transactions API (e2e)', () => {
-  let app: INestApplication;
   let walletId: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    await app.init();
-
     // Cria carteira base para testes
     const wallet = await dataSource.getRepository(Wallet).save(
       Wallet.create('player-transactions', Currency.BRL)
@@ -28,10 +16,6 @@ describe('Wagering Transactions API (e2e)', () => {
     wallet.credit(Money.fromString('500.00'));
     await dataSource.getRepository(Wallet).save(wallet);
     walletId = wallet.id;
-  });
-
-  afterAll(async () => {
-    await app.close();
   });
 
   describe('POST /wagering/transactions', () => {

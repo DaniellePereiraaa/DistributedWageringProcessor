@@ -20,6 +20,7 @@ import {
   ReferencedTransactionNotProcessedException,
   InvalidTransactionStateException,
   OptimisticLockException,
+  InvalidReferenceException,
 } from '../../common/exceptions/domain.exceptions';
 import { REPOSITORY_TOKENS } from '@/infrastructure/persistence/repository-tokens';
 
@@ -68,7 +69,27 @@ export class ProcessWagerTransactionUseCase {
 
     if (existingInbox) {
       if (existingInbox.status === 'PROCESSED') {
-        // Already processed - return existing transaction
+        // Check if payload matches (same idempotency key with different payload should be 409)
+        const existingPayload = existingInbox.payload;
+
+        // Compare relevant fields individually (order-independent)
+        const payloadMatches =
+          existingPayload.walletId === command.walletId &&
+          existingPayload.kind === command.kind &&
+          existingPayload.amount === command.amount &&
+          existingPayload.idempotencyKey === command.idempotencyKey &&
+          existingPayload.referenceTransactionId === command.referenceTransactionId &&
+          existingPayload.description === command.description &&
+          JSON.stringify(existingPayload.metadata) === JSON.stringify(command.metadata);
+
+        if (!payloadMatches) {
+          throw new IdempotencyConflictException(
+            command.idempotencyKey,
+            existingInbox.messageId
+          );
+        }
+
+        // Already processed with same payload - return existing transaction
         const existingTx = await this.transactionRepository.findByIdempotencyKey(
           command.idempotencyKey
         );
@@ -128,6 +149,11 @@ export class ProcessWagerTransactionUseCase {
       };
     }
 
+    // Validate reference transaction is provided for REFUND/ROLLBACK
+    if ((command.kind === TransactionKind.REFUND || command.kind === TransactionKind.ROLLBACK) && !command.referenceTransactionId) {
+      throw new InvalidReferenceException(`${command.kind} requires a referenceTransactionId`);
+    }
+
     // Create transaction record
     const tx = WagerTransaction.create(
       wallet.id,
@@ -142,7 +168,7 @@ export class ProcessWagerTransactionUseCase {
     // Handle reference transaction validation for REFUND/ROLLBACK
     let referenceTx: WagerTransaction | null = null;
     if (command.referenceTransactionId) {
-      referenceTx = await this.transactionRepository.findById(command.referenceTransactionId, manager);
+      referenceTx = await this.transactionRepository.findReferenceById(command.referenceTransactionId, manager);
       if (!referenceTx) {
         tx.markRejected();
         await this.transactionRepository.save(tx, manager);
@@ -153,9 +179,12 @@ export class ProcessWagerTransactionUseCase {
       // Check if reference is processed
       if (referenceTx.status !== TransactionStatus.PROCESSED) {
         // Mark as pending reference - will be retried by retry worker
-        tx.markPendingReference();
-        await this.transactionRepository.save(tx, manager);
-        await this.createInboxRecord(command, manager);
+        // Save in a separate transaction so it persists even when we throw
+        await this.dataSource.transaction(async (pendingManager) => {
+          tx.markPendingReference();
+          await this.transactionRepository.save(tx, pendingManager);
+          await this.createInboxRecord(command, pendingManager);
+        });
         throw new ReferencedTransactionNotProcessedException(
           command.referenceTransactionId,
           referenceTx.status
@@ -247,22 +276,22 @@ export class ProcessWagerTransactionUseCase {
     // REFUND references BET
     if (tx.kind === TransactionKind.REFUND) {
       if (referenceTx.kind !== TransactionKind.BET) {
-        throw new Error('REFUND can only reference BET transactions');
+        throw new InvalidReferenceException('REFUND can only reference BET transactions');
       }
       // Refund amount should not exceed original bet amount
       if (tx.amount.greaterThan(referenceTx.amount)) {
-        throw new Error('Refund amount cannot exceed original bet amount');
+        throw new InvalidReferenceException('Refund amount cannot exceed original bet amount');
       }
     }
 
     // ROLLBACK references REFUND
     if (tx.kind === TransactionKind.ROLLBACK) {
       if (referenceTx.kind !== TransactionKind.REFUND) {
-        throw new Error('ROLLBACK can only reference REFUND transactions');
+        throw new InvalidReferenceException('ROLLBACK can only reference REFUND transactions');
       }
       // Rollback amount should match refund amount
       if (!tx.amount.equals(referenceTx.amount)) {
-        throw new Error('Rollback amount must match refund amount');
+        throw new InvalidReferenceException('Rollback amount must match refund amount');
       }
     }
   }

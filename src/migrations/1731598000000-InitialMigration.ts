@@ -358,6 +358,16 @@ export class InitialMigration1731598000000 implements MigrationInterface {
             type: 'timestamptz',
             isNullable: true,
           },
+          {
+            name: 'retry_count',
+            type: 'int',
+            default: 0,
+          },
+          {
+            name: 'last_error',
+            type: 'text',
+            isNullable: true,
+          },
         ],
       }),
       true,
@@ -405,9 +415,26 @@ export class InitialMigration1731598000000 implements MigrationInterface {
             isNullable: false,
           },
           {
+            name: 'idempotency_key',
+            type: 'varchar',
+            length: '255',
+            isNullable: true,
+          },
+          {
             name: 'payload',
             type: 'jsonb',
             isNullable: false,
+          },
+          {
+            name: 'status',
+            type: 'varchar',
+            length: '50',
+            default: "'PENDING'",
+          },
+          {
+            name: 'error_message',
+            type: 'text',
+            isNullable: true,
           },
           {
             name: 'processed_at',
@@ -424,13 +451,21 @@ export class InitialMigration1731598000000 implements MigrationInterface {
       true,
     );
 
-    // Unique index for idempotency (message_id + consumer_name)
+    // Unique index for idempotency (consumer_name + message_id)
     await queryRunner.createIndex(
       'inbox_messages',
       new TableIndex({
         name: 'IDX_inbox_messages_idempotency',
-        columnNames: ['message_id', 'consumer_name'],
+        columnNames: ['consumer_name', 'message_id'],
         isUnique: true,
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'inbox_messages',
+      new TableIndex({
+        name: 'IDX_inbox_messages_idempotency_key',
+        columnNames: ['idempotency_key'],
       }),
     );
 

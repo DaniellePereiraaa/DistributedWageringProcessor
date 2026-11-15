@@ -18,4 +18,8 @@ export interface WagerTransactionRepositoryInterface {
     idempotencyKey: string,
     manager?: EntityManager
   ): Promise<WagerTransaction | null>;
+  findReferenceById(
+    id: string,
+    manager?: EntityManager
+  ): Promise<WagerTransaction | null>;
 }

@@ -33,14 +33,14 @@ export class LedgerEntry {
   walletId: string;
 
   @ManyToOne(() => Wallet, (wallet) => wallet.ledgerEntries, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'walletId' })
+  @JoinColumn({ name: 'wallet_id' })
   wallet: Wallet;
 
   @Column({ type: 'uuid', unique: true })
   transactionId: string;
 
   @OneToOne(() => WagerTransaction, (tx) => tx.ledgerEntry)
-  @JoinColumn({ name: 'transactionId' })
+  @JoinColumn({ name: 'transaction_id' })
   transaction: WagerTransaction;
 
   @Column({
